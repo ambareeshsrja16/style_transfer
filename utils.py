@@ -71,6 +71,7 @@ def convert_to_size_and_save(img_src, filename, img_size= (256,256)):
 
 def resize_to_fixed(img_src, filename):
     """ write to specific size and output_name"""
+    import cv2
     img = cv2.imread(img_src, cv2.IMREAD_UNCHANGED)[:,:,::-1]
     shape = img.shape
     x = shape[0]
