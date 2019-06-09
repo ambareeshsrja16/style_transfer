@@ -69,6 +69,17 @@ def convert_to_size_and_save(img_src, filename, img_size= (256,256)):
     cv2.imwrite(filename, img_[:,:,::-1])
     return
 
+def resize_to_fixed(img_src, filename):
+    """ write to specific size and output_name"""
+    img = cv2.imread(img_src, cv2.IMREAD_UNCHANGED)[:,:,::-1]
+    shape = img.shape
+    x = shape[0]
+    y = shape[1]
+    z = min(x, y)
+    new_shape = (y*256//z, x*256//z)
+    img_ = cv2.resize(img, new_shape)
+    cv2.imwrite(filename, img_[:,:,::-1])
+    return
 
 def post_processing(cost_curves_filename="./artifacts/loss_details_per_epoch.txt"):
     """given the filename of [cost_curves_filename] (txt file)
