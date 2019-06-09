@@ -45,18 +45,19 @@ else:
     torch.set_default_tensor_type('torch.FloatTensor')
     kwargs = {}
 
-#Using COCO dataset. Use the first time, and then pickle it 
-# train_loader = get_data_loaders.get_classic_dataset(image_size=TRAIN_IMAGE_SIZE, batch_size= BATCH_SIZE)
-
-#Pickling
-# test_train_loader = get_data_loaders.get_classic_dataset()
-# with open("dataloader_pickled.pickle","wb") as f:
-#     pickle.dump(test_train_loader,f, protocol=pickle.HIGHEST_PROTOCOL)
 
 #Loading pickled dataloader
-with open('dataloader_pickled.pickle', 'rb') as f:
-    test_train_loader = pickle.load(f)
-
+try:
+    with open('dataloader_pickled.pickle', 'rb') as f:
+        test_train_loader = pickle.load(f)
+except:
+    #Using COCO dataset. Use the first time, and then pickle it 
+    train_loader = get_data_loaders.get_classic_dataset(image_size=TRAIN_IMAGE_SIZE, batch_size= BATCH_SIZE)
+    #Pickling
+    test_train_loader = get_data_loaders.get_classic_dataset()
+    with open("dataloader_pickled.pickle","wb") as f:
+        pickle.dump(test_train_loader,f, protocol=pickle.HIGHEST_PROTOCOL)
+    
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 with torch.no_grad():
@@ -64,21 +65,14 @@ with torch.no_grad():
     vgg_network.eval()
     vgg_network.to(device)
 
-style_img_tensor = utils.get_batch_tensor_from_image(image=TRAIN_STYLE_IMAGE, image_size=TRAIN_IMAGE_SIZE, device=device) #[1,3,512,512]
-
-with torch.no_grad():
-    style_embeddings = vgg_network(style_img_tensor)
-    style_image_gram_matrices = [utils.gram_matrix(layer) for layer in style_embeddings]
+style_img_tensor = utils.get_batch_tensor_from_image(image=TRAIN_STYLE_IMAGE, image_size=TRAIN_IMAGE_SIZE, device=device) #[1,3, TRAIN_IMAGE_SIZE, TRAIN_IMAGE_SIZE]
 
 # The network to be trained. Two variants are available - padded one, and no padding one
 test_net = get_Image_Transform_Network.RTST_ImgTfNetPadding()
 test_net.train()
 optimizer = Adam(test_net.parameters(), LEARNING_RATE)
 
-test_optimizer = optimizer
 test_vgg_network = vgg_network
-test_x = style_img_tensor
-
 mse_loss = nn.MSELoss()
 
 with torch.no_grad():
@@ -91,10 +85,9 @@ TV_REG_WEIGHT = 1e-6  #order of 1e-5: 1e-6 don't want the pixel loss to impact t
 STYLE_LOSS_WEIGHTS = [1e5, 1e5, 1e5, 1e5] #change and experiment for different layers
 CONTENT_LOSS_WEIGHT = 1.
 
-
 #Clean up train
 
-def train(starts_at=0,steps=100, cost_curves_filename = "./artifacts/loss_details_per_epoch.txt"):
+def train(starts_at=0,steps=100, PRINT_FREQUENCY=10,SAVE_FREQUENCY = 200, cost_curves_filename = "./artifacts/loss_details_per_epoch.txt"):
     test_net.train()
     count = starts_at
     agg_content_loss = 0.
@@ -143,8 +136,9 @@ def train(starts_at=0,steps=100, cost_curves_filename = "./artifacts/loss_detail
                          "agg_reg_loss": agg_reg_loss.item()/10,
                          "total_loss": (agg_content_loss.item() +agg_style_loss.item() +agg_reg_loss.item() )/ 10}
             
-            if count % 10 == 0:
-                message = f"{time.ctime()} [{count}/{steps}] content: {agg_content_loss / 10:.2f}  style: {agg_style_loss / 10:.2f}  reg: {agg_reg_loss / 10:.2f} total: {(agg_content_loss + agg_style_loss + agg_reg_loss ) / 10:.6f}"
+            if count % PRINT_FREQUENCY == 0:
+                time_stamp = now.strftime("%H:%M:%S")
+                message = f"{time_stamp} {count}/{steps} Content Loss: {agg_content_loss / 10:.2f}  Style Loss: {agg_style_loss / 10:.2f}  Reg Loss: {agg_reg_loss / 10:.2f} Total Loss: {(agg_content_loss + agg_style_loss + agg_reg_loss ) / 10:.6f}"
                 
                 #Write losses to a txt file for plotting cost curves later
                 with open(cost_curves_filename,"a") as f:             
@@ -160,8 +154,8 @@ def train(starts_at=0,steps=100, cost_curves_filename = "./artifacts/loss_detail
                 test_net.eval()
                 y = test_net(x) #
                 
-                #Save model every 200 epochs
-                if count%200==0:
+                #Save model every SAVE_FREQUENCY batches
+                if count%SAVE_FREQUENCY==0:
                     torch.save(test_net.state_dict(), f"./artifacts/saved_model_{count}")
                     current_time = now.strftime("%H:%M:%S")
                     utils.save_debug_image(x, y.detach(), f"./debug/{count}_{current_time}.png")
@@ -170,8 +164,10 @@ def train(starts_at=0,steps=100, cost_curves_filename = "./artifacts/loss_detail
                 
                 if count>=steps:
                     return
-# plt.show()
-# plt.imshow(utils.get_numpy_image_to_plot(style_img_tensor.cpu().detach().numpy())[0])
+            
+            
+plt.show()
+plt.imshow(utils.get_numpy_image_to_plot(style_img_tensor.cpu().detach().numpy())[0])
 
 train(0,100)
 
@@ -188,7 +184,9 @@ for x, _ in test_train_loader:
     break
 
 img_output = test_net(test_new_content)
-# plt.imshow(utils.get_numpy_image_to_plot(test_new_content.cpu().detach().numpy())[0])
-# plt.imshow(utils.get_numpy_image_to_plot(img_output.cpu().detach().numpy())[0])
+plt.imshow(utils.get_numpy_image_to_plot(test_new_content.cpu().detach().numpy())[0])
+
+plt.imshow(utils.get_numpy_image_to_plot(img_output.cpu().detach().numpy())[0])
 
 history = utils.post_processing()
+
