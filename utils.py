@@ -5,9 +5,10 @@ import torchvision as tv
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
-
 import numpy as np
 from PIL import Image
+
+import matplotlib.pyplot as plt
 
 
 def gram_matrix(x):
@@ -100,5 +101,58 @@ def post_processing(cost_curves_filename="./artifacts/loss_details_per_epoch.txt
     for num,item in enumerate(losses):
         temp_dict = eval(item)
         history[num] = temp_dict
-    return history 
+    return history
+
+def get_loss(lines):
+    """gets loss from list of strings in dict form as in Johnson et al code"""
+    x = []
+    content_loss = []
+    style_loss = []
+    tv_reg_loss = []
+    total_loss = []
+    for line in lines:
+        val = eval(line)
+        x.append(val['epoch'])
+        content_loss.append(val['agg_content_loss'])
+        style_loss.append(val['agg_style_loss'])
+        tv_reg_loss.append(val['agg_reg_loss'])
+        total_loss.append(val['total_loss'])
+    return x, content_loss, style_loss, tv_reg_loss, total_loss
         
+def plot_loss(x, content_loss, style_loss, tv_reg_loss, total_loss):
+    """returns plots with loss input as list"""
+    fig, axes = plt.subplots(nrows=1, ncols=4, sharey=False, figsize=(20, 5))
+    axes[0].plot(x[::20], content_loss[::20])
+    axes[0].set_xlim(10,40000)
+    axes[0].set_xticks(x[999::1000])
+    axes[0].set_title('Content Loss')
+    axes[0].set_xlabel('Iterations')
+    axes[0].set_ylabel('Loss')
+    axes[1].plot(x[::20], style_loss[::20])
+    axes[1].set_xlim(10,40000)
+    axes[1].set_ylim(0, 20)
+    axes[1].set_xticks(x[999::1000])
+    axes[1].set_title('Style Loss')
+    axes[1].set_xlabel('Iterations')
+    axes[1].set_ylabel('Loss')
+    axes[2].plot(x[::20], tv_reg_loss[::20])
+    axes[2].set_xlim(10,40000)
+    axes[2].set_xticks(x[999::1000])
+    axes[2].set_title('TV Regularization Loss')
+    axes[2].set_xlabel('Iterations')
+    axes[2].set_ylabel('Loss')
+    axes[3].plot(x[::20], total_loss[::20])
+    axes[3].set_ylim(0, 60)
+    axes[3].set_xlim(10,40000)
+    axes[3].set_xticks(x[999::1000])
+    axes[3].set_title('Total Loss')
+    axes[3].set_xlabel('Iterations')
+    axes[3].set_ylabel('Loss')
+    fig.show()
+    
+def get_plots(filename):
+    """plots loss for losses in given file"""
+    fd = open(filename)
+    lines = fd.readlines()
+    fd.close()
+    plot_loss(*get_loss(lines))
